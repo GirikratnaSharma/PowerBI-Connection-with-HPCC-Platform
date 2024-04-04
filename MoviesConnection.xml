@@ -1,0 +1,53 @@
+let
+    
+url = ""&link&"",
+    
+SOAPEnvelope =
+
+"<?xml version="&version&"?>
+<soap:Envelope xmlns:soap="&soap&" xmlns:SOAP-ENC="&soapenc&" xmlns="&wssql&">
+ <soap:Body>
+  <ExecuteSQLRequest>
+   <SqlText>SELECT * FROM gps::movielens::stagingmovies</SqlText>
+   <UserName>"&name&"</UserName>
+   <TargetCluster>"&cluster&"</TargetCluster>
+   <AlternateClusters>
+    <AlternateCluster/>
+   </AlternateClusters>
+   <TargetQuerySet/>
+   <SuppressResults>0</SuppressResults>
+   <SuppressXmlSchema>0</SuppressXmlSchema>
+   <Wait>-1</Wait>
+   <resultLimit>0</resultLimit>
+   <ResultWindowStart>0</ResultWindowStart>
+   <ResultWindowCount>0</ResultWindowCount>
+   <IgnoreCache/>
+  </ExecuteSQLRequest>
+ </soap:Body>
+</soap:Envelope>",
+
+    options = [
+        #"Content-Type"="text/xml;charset=utf-8"
+    ],
+
+    responseBinary = Web.Contents(url, [Content=Text.ToBinary(SOAPEnvelope), Headers=options]),
+
+    responseText = Text.FromBinary(responseBinary, TextEncoding.Ascii),
+
+    startPos = Text.PositionOf(responseText, "Dataset name=&apos;WsSQLResult&apos; xmlSchema=&quot;WsSQLResultSchema&quot;&gt;") + Text.Length("Dataset name=&apos;WsSQLResult&apos; xmlSchema=&quot;WsSQLResultSchema&quot;&gt;"),
+    endPos = Text.PositionOf(responseText, "&lt;/Dataset&gt"),
+    resultXmlText = Text.Middle(responseText, startPos, endPos - startPos),
+
+    // Decode the HTML entities
+    decodedXmlContent = Text.Replace(Text.Replace(Text.Replace(Text.Replace(resultXmlText, "&lt;", "<"), "&gt;", ">"), "&quot;", """"), "&apos;", "'"),
+
+    // Wrap the XML content with a single root element
+    xmlWithRoot = "<Root>" & decodedXmlContent & "</Root>",
+
+    // Parse the XML content into a table
+    xmlTable = Xml.Tables(xmlWithRoot){0},
+    // Parse the XML content into a table
+    Table = xmlTable[Table],
+    #"Expanded title" = Table.ExpandTableColumn(Table, "title", {"Element:Text"}, {"title.Element:Text"})
+in
+    #"Expanded title"
