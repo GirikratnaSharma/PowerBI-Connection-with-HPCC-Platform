@@ -1,0 +1,298 @@
+DIFFERENT VERSIONS OF THE CODE:
+
+
+
+
+let
+    
+url = "http://localhost:8510/ExecuteSQL?ver_=0",
+    
+SOAPEnvelope =
+
+"<?xml version=#(0022)1.0#(0022) encoding=#(0022)utf-8#(0022)?>
+<soap:Envelope xmlns:soap=#(0022)http://schemas.xmlsoap.org/soap/envelope/#(0022) xmlns:SOAP-ENC=#(0022)http://schemas.xmlsoap.org/soap/encoding/#(0022) xmlns=#(0022)urn:hpccsystems:ws:wssql#(0022)>
+ <soap:Body>
+  <ExecuteSQLRequest>
+   <SqlText>SELECT total FROM  thor::local::gps::intro::example_data</SqlText>
+   <UserName>fin2</UserName>
+   <TargetCluster>thor</TargetCluster>
+   <AlternateClusters>
+    <AlternateCluster/>
+   </AlternateClusters>
+   <TargetQuerySet/>
+   <SuppressResults>0</SuppressResults>
+   <SuppressXmlSchema>0</SuppressXmlSchema>
+   <Wait>-1</Wait>
+   <resultLimit>0</resultLimit>
+   <ResultWindowStart>0</ResultWindowStart>
+   <ResultWindowCount>0</ResultWindowCount>
+   <IgnoreCache/>
+  </ExecuteSQLRequest>
+ </soap:Body>
+</soap:Envelope>",
+
+options = [
+    #"Content-Type"="text/xml;charset=utf-8"
+
+],
+
+    Source = Table.FromColumns({Lines.FromBinary(Web.Contents(url, [Content=Text.ToBinary(SOAPEnvelope), Headers = options]), null, null, 65001)})
+in
+    Source
+
+
+
+WORKNG CODE FOR TABLE FORM:
+
+let
+    
+url = "http://localhost:8510/ExecuteSQL?ver_=0",
+    
+SOAPEnvelope =
+
+"<?xml version=#(0022)1.0#(0022) encoding=#(0022)utf-8#(0022)?>
+<soap:Envelope xmlns:soap=#(0022)http://schemas.xmlsoap.org/soap/envelope/#(0022) xmlns:SOAP-ENC=#(0022)http://schemas.xmlsoap.org/soap/encoding/#(0022) xmlns=#(0022)urn:hpccsystems:ws:wssql#(0022)>
+ <soap:Body>
+  <ExecuteSQLRequest>
+   <SqlText>SELECT * FROM  thor::local::gps::intro::example_data</SqlText>
+   <UserName>bcd</UserName>
+   <TargetCluster>thor</TargetCluster>
+   <AlternateClusters>
+    <AlternateCluster/>
+   </AlternateClusters>
+   <TargetQuerySet/>
+   <SuppressResults>0</SuppressResults>
+   <SuppressXmlSchema>0</SuppressXmlSchema>
+   <Wait>-1</Wait>
+   <resultLimit>0</resultLimit>
+   <ResultWindowStart>0</ResultWindowStart>
+   <ResultWindowCount>0</ResultWindowCount>
+   <IgnoreCache/>
+  </ExecuteSQLRequest>
+ </soap:Body>
+</soap:Envelope>",
+    options = [
+        #"Content-Type"="text/xml;charset=utf-8"
+    ],
+
+    response = Table.FromColumns({Lines.FromBinary(Web.Contents(url, [Content=Text.ToBinary(SOAPEnvelope), Headers = options]), null, null, 65001)}),
+
+    xmlContent = Text.Combine(response[Column1], " "), 
+
+    startPos = Text.PositionOf(xmlContent, "<Result>") + Text.Length("<Result>"),
+    endPos = Text.PositionOf(xmlContent, "</Result>"),
+    resultXmlText = Text.Middle(xmlContent, startPos, endPos - startPos),
+
+    // Decode the HTML entities
+    decodedXmlContent = Text.Replace(Text.Replace(Text.Replace(Text.Replace(resultXmlText, "&lt;", "<"), "&gt;", ">"), "&quot;", """"), "&apos;", "'"),
+
+
+    // Split the XML content into individual documents
+    xmlDocuments = Text.Split(decodedXmlContent, "</Row>"),
+
+    xmlDocument = List.Skip(xmlDocuments),
+
+    // Filter out any empty strings from the list
+    xmlDocumentsFiltered = List.Select(xmlDocument, each _ <> ""),
+
+    // Parse each XML document
+    resultTables = List.Transform(xmlDocumentsFiltered, each Xml.Tables("" & _ & "</Row>"))
+in
+    resultTables
+
+
+
+CLEAN CODE WHICH WORKS WITH ANY DATA:
+
+let
+    
+url = "http://localhost:8510/ExecuteSQL?ver_=0",
+    
+SOAPEnvelope =
+
+"<?xml version=#(0022)1.0#(0022) encoding=#(0022)utf-8#(0022)?>
+<soap:Envelope xmlns:soap=#(0022)http://schemas.xmlsoap.org/soap/envelope/#(0022) xmlns:SOAP-ENC=#(0022)http://schemas.xmlsoap.org/soap/encoding/#(0022) xmlns=#(0022)urn:hpccsystems:ws:wssql#(0022)>
+ <soap:Body>
+  <ExecuteSQLRequest>
+   <SqlText>SELECT * FROM  thor::local::gps::intro::example_data</SqlText>
+   <UserName>cle</UserName>
+   <TargetCluster>thor</TargetCluster>
+   <AlternateClusters>
+    <AlternateCluster/>
+   </AlternateClusters>
+   <TargetQuerySet/>
+   <SuppressResults>0</SuppressResults>
+   <SuppressXmlSchema>0</SuppressXmlSchema>
+   <Wait>-1</Wait>
+   <resultLimit>0</resultLimit>
+   <ResultWindowStart>0</ResultWindowStart>
+   <ResultWindowCount>0</ResultWindowCount>
+   <IgnoreCache/>
+  </ExecuteSQLRequest>
+ </soap:Body>
+</soap:Envelope>",
+
+    options = [
+        #"Content-Type"="text/xml;charset=utf-8"
+    ],
+
+    responseBinary = Web.Contents(url, [Content=Text.ToBinary(SOAPEnvelope), Headers=options]),
+
+    responseText = Text.FromBinary(responseBinary, TextEncoding.Ascii),
+
+    startPos = Text.PositionOf(responseText, "Dataset name=&apos;WsSQLResult&apos; xmlSchema=&quot;WsSQLResultSchema&quot;&gt;") + Text.Length("Dataset name=&apos;WsSQLResult&apos; xmlSchema=&quot;WsSQLResultSchema&quot;&gt;"),
+    endPos = Text.PositionOf(responseText, "&lt;/Dataset&gt"),
+    resultXmlText = Text.Middle(responseText, startPos, endPos - startPos),
+
+    // Decode the HTML entities
+    decodedXmlContent = Text.Replace(Text.Replace(Text.Replace(Text.Replace(resultXmlText, "&lt;", "<"), "&gt;", ">"), "&quot;", """"), "&apos;", "'"),
+
+    // Wrap the XML content with a single root element
+    xmlWithRoot = "<Root>" & decodedXmlContent & "</Root>",
+
+    // Parse the XML content into a table
+    xmlTable = Xml.Tables(xmlWithRoot){0},
+    // Parse the XML content into a table
+    Table = xmlTable[Table]
+in
+    Table
+
+
+
+systemctl start hpccsystems-platform.target   imp line for execution 
+
+According to LocalHost 7070: [server ip=172.29.229.115, client ip=127.0.0.1, role=Unknown]
+
+http://10.194.205.102:8010    Link for dev ecl watch
+
+
+
+MY IP OVER INTRANET:    IPv4 Address. . . . . . . . . . . : 10.145.10.170    via VPN
+
+172.18.0.1   for IPV4 LAN. and 172.29.224.1 for WSL 
+
+172.29.229.115    Linux IP 
+
+
+
+# This configuration file was automatically generated by Gitpod.
+# Please adjust to your needs (see https://www.gitpod.io/docs/introduction/learn-gitpod/gitpod-yaml)
+# and commit this file to your remote git repository to share the goodness with others.
+
+# Learn more from ready-to-use templates: https://www.gitpod.io/docs/introduction/getting-started/quickstart
+
+tasks:
+  - # install helm command for linux
+  - init: mkdir -p ~/hpccdata/{dalistorage,hpcc-data,debug,queries,sasha,dropzone}
+  - command: helm install hpcc-localfile hpcc/hpcc-localfile --set common.hostpath=~/hpccdata
+  # see how to use/make mystorage.yaml file
+  - command: helm install mycluster hpcc/hpcc --version=8.6.14 
+
+SAMPLE CODE IN GITPOD.YAML FILE:
+
+image: gitpod/workspace-full
+
+# Commands that will run on workspace start
+tasks:
+    - name: Setup, Install & Build
+      before: yarn global add express
+      init: yarn install
+      command: yarn build
+
+# Ports to expose on workspace startup
+ports:
+    - port: 3000
+      onOpen: open-preview
+      name: Website
+      description: Website Preview
+
+
+
+
+NOTE: Adding the ECL code for the Rating and Movie data files here, not to be shared:
+
+
+Staging Movies:
+
+IMPORT $;
+IMPORT STD;
+
+Layout_StagingMovies := RECORD 
+   INTEGER4 movieID;
+   STRING Title;
+   INTEGER Year;
+   STRING Genres;
+END;
+
+
+RawMovies := $.RawMovies;
+
+Layout_StagingMovies StagingFunction(RawMovies L) := TRANSFORM
+
+  ////Pos := std.str.find(L.Title, '(' , 1);
+  
+  ////SELF.Title := L.Title[..Pos-1];
+  
+  //SELF.Year := (INTEGER)L.title[Pos +1..Pos +4] ;
+  
+  //titlePattern := '/^\\w+\\s+';
+  
+  patt := '(.*)(\\s)\\((\\d+)\\)';
+  
+  yearPattern := '\\((\\d+)\\)';
+
+  //SELF.Title := (STRING)REGEXFIND(titlePattern,L.Title,1);
+
+  //SELF.Year := (INTEGER)REGEXFIND(yearPattern,L.Title,1);
+ 
+  SELF.title := regexfind(patt, L.Title, 1);
+  
+  SELF.year := (INTEGER)regexfind(patt, L.Title,3);
+  
+  SELF := L;
+
+END;
+
+stgMovies := PROJECT(RawMovies, StagingFunction(LEFT));
+
+OUTPUT(stgMovies,,'~gps::movielens::stagingmovies',OVERWRITE);
+
+
+
+
+
+
+Staging Ratings:
+
+
+IMPORT $;
+IMPORT STD;
+
+Layout_StagingRating := RECORD 
+   INTEGER4 userID;
+   STRING movieID;
+   DECIMAL rating;
+   STRING timeStamp;
+END;
+
+
+RawRating := $.RawRating;
+
+Layout_StagingRating StagingFunction(RawRating L) := TRANSFORM
+
+  //Using Function defined in ECLLibrary under STD::Date 
+
+  SELF.timeStamp := STD.Date.SecondsToString(L.timeStamp,'%Y-%m-%d-%H-%M-%S');
+  
+  SELF := L;
+
+END;
+
+stgRating := PROJECT(RawRating, StagingFunction(LEFT));
+
+OUTPUT(stgRating,,'~gps::movielens::stagingrating',OVERWRITE);
+
+
+
+
+

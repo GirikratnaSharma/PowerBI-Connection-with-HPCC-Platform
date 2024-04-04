@@ -1,0 +1,105 @@
+GitPod .yml file: 
+
+image:
+  file: .gitpod.Dockerfile
+#image: hpccsystems/platform
+#image: my-gitpod-image
+tasks:
+  - name: Install Helm
+    init: |
+      curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
+      chmod 700 get_helm.sh
+      ./get_helm.sh
+    command: helm
+  - name: Install HPCC Platform
+    command: |
+      helm install mycluster hpcc/hpcc --version=8.6.14 -f mystorage.yaml
+    openMode: split-right
+ports:
+  - port: 8010
+    onOpen: ignore
+  - port: 8002
+    onOpen: open-preview
+  # - port: 8008
+  #   onOpen: open-previewhelm
+
+
+GitPod.Dockerfile : 
+
+FROM gitpod/workspace-full
+
+USER root
+
+# Install dependencies for building HPCC Platform
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        cmake \
+        libicu-dev \
+        libboost-all-dev \
+        libldap2-dev \
+        libxslt1-dev \
+        uuid-dev \
+        libxml2-utils \
+        wget \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Clone HPCC Platform repository
+RUN git clone https://github.com/hpcc-systems/HPCC-Platform.git /workspace/HPCC-Platform
+
+USER gitpod
+
+# Additional configurations or installations specific to your development environment can be added here
+
+# Example: Set environment variables
+ENV HPCC_ROOT=/workspace/HPCC-Platform
+
+
+# FROM hpccsystems/platform
+
+# RUN apt-get update && apt-get install -y git
+
+
+# -> Dir/github (??)
+# -> 
+
+
+
+
+mystorage. yml file: 
+
+
+storage:
+ planes:
+ - name: dali
+ pvc: dali-hpcc-localfile-pvc
+ prefix: "/var/lib/HPCCSystems/dalistorage"
+ category: dali
+ - name: dll
+ pvc: dll-hpcc-localfile-pvc
+ prefix: "/var/lib/HPCCSystems/queries"
+ category: dll
+ - name: sasha
+ pvc: sasha-hpcc-localfile-pvc
+ prefix: "/var/lib/HPCCSystems/sasha"
+ category: sasha
+ - name: debug
+ pvc: debug-hpcc-localfile-pvc
+ prefix: "/var/lib/HPCCSystems/debug"
+ category: debug
+ - name: data
+ pvc: data-hpcc-localfile-pvc
+ prefix: "/var/lib/HPCCSystems/hpcc-data"
+ category: data
+ - name: mydropzone
+ pvc: mydropzone-hpcc-localfile-pvc
+ prefix: "/var/lib/HPCCSystems/dropzone"
+ category: lz
+sasha:
+ wu-archiver:
+ plane: sasha
+ dfuwu-archiver:
+ plane: sasha
+
+
